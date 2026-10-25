@@ -10,6 +10,7 @@ build/
 .tools/
 .env
 .firebase-auth-code.txt
+.github-token.txt
 .firebase/
 *-debug.log
 
