@@ -1,61 +1,88 @@
-# StaffSync GitHub Push Automation Script
-param(
-    [string]$RepoUrl = "https://github.com/sakshiverma100805/StaffSync.git",
-    [string]$Token = ""
-)
+# StaffSync GitHub Push Script
+# Secure interactive push script for Windows PowerShell
 
-$gitExe = "$PSScriptRoot\.tools\git\cmd\git.exe"
+$ErrorActionPreference = 'Stop'
 
-if (-not (Test-Path $gitExe)) {
-    $gitExe = "git"
+$RepoUrl = 'https://github.com/sakshiverma100805/StaffSync.git'
+$Username = 'sakshiverma100805'
+$GitExe = Join-Path $PSScriptRoot '.tools\git\cmd\git.exe'
+
+if (-not (Test-Path $GitExe)) {
+    $GitExe = 'git'
 }
 
-Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "   StaffSync — Push Local Repository to GitHub            " -ForegroundColor Yellow
-Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host ""
+Write-Host '======================================================' -ForegroundColor Cyan
+Write-Host '   StaffSync - Push Local Repository to GitHub        ' -ForegroundColor Yellow
+Write-Host '======================================================' -ForegroundColor Cyan
+Write-Host ''
 Write-Host "Target Repository: $RepoUrl" -ForegroundColor Green
-Write-Host ""
+Write-Host "Account: $Username" -ForegroundColor Green
+Write-Host ''
 
-# Check for local token drop file if present
-$tokenFile = "$PSScriptRoot\.github-token.txt"
-if (Test-Path $tokenFile) {
-    $lines = Get-Content $tokenFile
-    foreach ($line in $lines) {
-        $trimmed = $line.Trim()
-        if ($trimmed -and -not $trimmed.StartsWith("#")) {
-            $Token = $trimmed
-            break
-        }
-    }
+# 1. Ensure clean origin remote URL is configured
+try {
+    & $GitExe remote remove origin 2>$null
+} catch {}
+
+& $GitExe remote add origin $RepoUrl
+
+# 2. Prompt for Personal Access Token securely (masked with asterisks)
+Write-Host 'GitHub requires a Personal Access Token (PAT) with repo scope.' -ForegroundColor Yellow
+Write-Host 'Your token is masked and will NEVER be saved or printed.' -ForegroundColor DarkGray
+Write-Host ''
+
+$SecureToken = Read-Host -Prompt 'Enter your GitHub Personal Access Token (PAT)' -AsSecureString
+
+if (-not $SecureToken) {
+    Write-Host 'Error: No token entered. Push cancelled.' -ForegroundColor Red
+    exit 1
 }
 
-# If token provided or found, push using authenticated URL
-if ($Token) {
-    Write-Host "Using secure GitHub access token..." -ForegroundColor Cyan
-    $authUrl = $RepoUrl -replace "https://", "https://sakshiverma100805:$Token@"
-    & $gitExe remote set-url origin $authUrl
-    & $gitExe push -u origin main
-    # Reset origin to clean public URL without token
-    & $gitExe remote set-url origin $RepoUrl
-    exit $LASTEXITCODE
+# Convert secure string to in-memory plain string for the push
+$BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecureToken)
+$PlainToken = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+[System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
+
+$PushExitCode = 1
+
+try {
+    Write-Host ''
+    Write-Host 'Authenticating and pushing main branch to GitHub...' -ForegroundColor Cyan
+    
+    # Configure temporary authenticated URL in memory
+    $AuthRemoteUrl = "https://${Username}:${PlainToken}@github.com/${Username}/StaffSync.git"
+    & $GitExe remote set-url origin $AuthRemoteUrl
+    
+    # Execute push
+    & $GitExe push -u origin main
+    $PushExitCode = $LASTEXITCODE
+}
+catch {
+    Write-Host "Error during push: $($_.Exception.Message)" -ForegroundColor Red
+    $PushExitCode = 1
+}
+finally {
+    # CRITICAL SECURITY CLEANUP:
+    # Always reset the remote URL back to the clean public URL so no token remains in .git/config
+    & $GitExe remote set-url origin $RepoUrl
+    
+    # Wipe the token variables from memory
+    $PlainToken = $null
+    $SecureToken = $null
+    $AuthRemoteUrl = $null
+    [System.GC]::Collect()
 }
 
-# Interactive terminal push
-Write-Host "Configuring origin remote..." -ForegroundColor Cyan
-& $gitExe remote remove origin 2>$null
-& $gitExe remote add origin $RepoUrl
-
-Write-Host "Pushing main branch to GitHub..." -ForegroundColor Cyan
-Write-Host "(When prompted for password, paste your GitHub Personal Access Token)" -ForegroundColor Yellow
-& $gitExe push -u origin main
-
-if ($LASTEXITCODE -eq 0) {
-    Write-Host ""
-    Write-Host "SUCCESS! Your StaffSync project is now live on GitHub." -ForegroundColor Green
-    Write-Host "Repository: $RepoUrl" -ForegroundColor White
+Write-Host ''
+if ($PushExitCode -eq 0) {
+    Write-Host '======================================================' -ForegroundColor Green
+    Write-Host ' SUCCESS: StaffSync successfully pushed to GitHub!    ' -ForegroundColor Green
+    Write-Host '======================================================' -ForegroundColor Green
+    Write-Host "Repository URL: $RepoUrl" -ForegroundColor White
 } else {
-    Write-Host ""
-    Write-Host "Authentication failed or cancelled." -ForegroundColor Red
-    Write-Host "Tip: GitHub requires a Personal Access Token (PAT) instead of your account password." -ForegroundColor Yellow
+    Write-Host '======================================================' -ForegroundColor Red
+    Write-Host ' Push failed. Please check token permissions (repo).  ' -ForegroundColor Red
+    Write-Host '======================================================' -ForegroundColor Red
 }
+
+exit $PushExitCode
