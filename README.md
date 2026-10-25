@@ -44,6 +44,17 @@
 
 ```text
 StaffSync/
+├── Ideation Phase-(1)/                      # Phase 1: Problem Statement, Empathy Map & Idea Prioritization
+│   ├── Brainstorm & Idea Prioritization Template.docx
+│   └── Problem Statement & Empathy Map.docx
+├── Project Planning Phase(2)/               # Phase 2: Project Planning & Sprint Schedule
+│   └── Project Planning & Sprint Schedule.docx
+├── Requirement Analysis(3)/                 # Phase 3: Software & Hardware Requirements
+│   └── Software & Hardware Requirements Analysis.docx
+├── Project Design Phase(4)/                 # Phase 4: Technical Architecture, ER Diagrams & MVC
+│   └── Technical Architecture, ER Diagram & MVC Design.docx
+├── Performance Testing/                     # Phase 5: Functional & Performance Testing Reports
+│   └── Functional & Performance Testing Report.docx
 ├── client/                                  # React.js + Vite Frontend
 │   ├── src/
 │   │   ├── components/

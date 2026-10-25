@@ -53,6 +53,10 @@ try {
     $AuthRemoteUrl = "https://${Username}:${PlainToken}@github.com/${Username}/StaffSync.git"
     & $GitExe remote set-url origin $AuthRemoteUrl
     
+    # Fetch and rebase any remote changes cleanly if needed
+    & $GitExe fetch origin main 2>$null
+    & $GitExe rebase origin/main 2>$null
+
     # Execute push
     & $GitExe push -u origin main
     $PushExitCode = $LASTEXITCODE
