@@ -1,0 +1,83 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions for Role-Based Access Control
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function getUserRole() {
+      return isAuthenticated() ? getUserData().role : null;
+    }
+
+    function isHR() {
+      return getUserRole() == 'HR';
+    }
+
+    function isManager() {
+      return getUserRole() == 'Manager';
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // 1. Users collection
+    // Each user can read/write their own profile; HR can read all profiles.
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isHR() || isManager());
+      allow create: if isAuthenticated() && isOwner(userId);
+      allow update: if isAuthenticated() && (isOwner(userId) || isHR());
+      allow delete: if isAuthenticated() && isHR();
+    }
+
+    // 2. Employees collection (Managed by HR)
+    // All authenticated staff can view the directory; only HR can add/edit/delete.
+    match /employees/{employeeId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated() && isHR();
+    }
+
+    // 3. Leaves collection
+    // Employees can read and submit their own leaves.
+    // Managers & HR can read all and approve/reject leaves.
+    match /leaves/{leaveId} {
+      allow read: if isAuthenticated() && (resource.data.user == request.auth.uid || isHR() || isManager());
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (isHR() || isManager());
+      allow delete: if isAuthenticated() && isHR();
+    }
+
+    // 4. Attendance collection
+    // Employees can read their own attendance records and record Check-in/Check-out.
+    // HR can view all company records.
+    match /attendance/{attendanceId} {
+      allow read: if isAuthenticated() && (resource.data.user == request.auth.uid || isHR());
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (resource.data.user == request.auth.uid || isHR());
+      allow delete: if isAuthenticated() && isHR();
+    }
+
+    // 5. Announcements collection
+    // All authenticated users can read announcements matching their role.
+    // Only HR and Managers can post or delete announcements.
+    match /announcements/{announcementId} {
+      allow read: if isAuthenticated();
+      allow create, delete: if isAuthenticated() && (isHR() || isManager());
+      allow update: if isAuthenticated() && isHR();
+    }
+
+    // 6. Trainings collection
+    // All employees and managers can view scheduled trainings.
+    // Only Managers and HR can create, update, or delete training programs.
+    match /trainings/{trainingId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated() && (isManager() || isHR());
+    }
+  }
+}

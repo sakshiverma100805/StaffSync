@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+.npm-cache/
+
+# Production builds
+dist/
+build/
+
+# Local tools & credentials
+.tools/
+.env
+.firebase-auth-code.txt
+.firebase/
+*-debug.log
+
+# System files
+.DS_Store
+Thumbs.db
